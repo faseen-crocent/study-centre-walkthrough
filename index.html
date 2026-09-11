@@ -132,6 +132,20 @@ button:focus-visible,.pr:focus-visible{outline:2px solid var(--turmeric-2);outli
 #loading.gone{display:none}
 #loading .box{text-align:center}
 #loading .box b{display:block;font:500 26px var(--serif);margin-bottom:6px}
+#loading .nogl{max-width:720px;width:100%;max-height:100%;overflow:auto;padding:32px var(--gutter);font:400 14.5px/1.5 var(--sans);color:#243530}
+#loading .nogl h2{margin:0 0 10px;font:500 28px/1.15 var(--serif);color:#16302a;text-wrap:balance}
+#loading .nogl p{margin:0 0 12px;max-width:62ch}
+#loading .nogl .why{display:block;margin-top:6px;font-size:12.5px;color:#5c6c66}
+#loading .nogl ol{margin:0 0 16px;padding-left:22px;max-width:62ch}
+#loading .nogl li{margin:0 0 8px}
+#loading .nogl code{font:12.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;background:#cfd9dd;padding:2px 5px;border-radius:3px}
+#loading .nogl button{padding:9px 16px;border-radius:var(--radius);background:var(--ink);color:var(--lime);font-weight:500}
+#loading .fallback{display:grid;grid-template-columns:1fr;gap:18px;margin-top:22px;padding-top:22px;border-top:1px solid #c6d0d4}
+#loading .fallback img{width:100%;height:auto;background:#fff;border:1px solid #c6d0d4}
+#loading .fallback table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:13.5px}
+#loading .fallback caption{text-align:left;color:#5c6c66;padding-bottom:6px}
+#loading .fallback td{padding:5px 0;border-bottom:1px solid #d5dde0}
+#loading .fallback td+td{text-align:right;white-space:nowrap;padding-left:12px}
 
 /* ---------- mobile tabs (bottom sheet) ---------- */
 #tabs{display:none}
@@ -321,14 +335,66 @@ for (const id of ['toilet1', 'toilet2', 'toilet3', 'store', 'terrace', 'stair'])
    2. RENDERER, SCENE, LIGHT
    ===================================================================== */
 const stage = document.getElementById('stage');
-let renderer;
-try {
-  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-} catch (e) {
-  document.getElementById('loading').innerHTML = '<div class="box"><b>3D is unavailable</b>This browser could not start WebGL. Try a current version of Chrome, Safari or Firefox.</div>';
-  throw e;
-}
 const isTouch = matchMedia('(pointer: coarse)').matches;
+
+// Start WebGL as robustly as possible: WebGL 2 with antialiasing first, then
+// lighter settings, then WebGL 1.  Each attempt gets a fresh canvas.
+function createRenderer() {
+  if (new URLSearchParams(location.search).has('no3d')) return { error: 'Opened with ?no3d, so the 3D view was skipped on purpose.' };
+  const attempts = [
+    { antialias: true, powerPreference: 'high-performance' },
+    { antialias: true },
+    { antialias: false, powerPreference: 'low-power' },
+    { antialias: false, webgl1: true },
+  ];
+  let reason = '';
+  for (const a of attempts) {
+    const canvas = document.createElement('canvas');
+    canvas.addEventListener('webglcontextcreationerror', e => { if (e.statusMessage) reason = e.statusMessage; }, { once: true });
+    try {
+      const { webgl1, ...opts } = a;
+      const R = webgl1 && THREE.WebGL1Renderer ? THREE.WebGL1Renderer : THREE.WebGLRenderer;
+      const r = new R(Object.assign({ canvas, failIfMajorPerformanceCaveat: false }, opts));
+      if (r.getContext()) return r;
+    } catch (e) { if (!reason) reason = e && e.message || ''; }
+  }
+  return { error: reason };
+}
+function showNoWebGL(reason) {
+  const ua = navigator.userAgent, isChrome = /Chrome|CriOS|Edg/.test(ua) && !/OPR/.test(ua), isFirefox = /Firefox/.test(ua), isSafari = /Safari/.test(ua) && !/Chrome|CriOS/.test(ua);
+  const steps = [];
+  if (isChrome) steps.push('Open <code>chrome://settings/system</code>, turn on <b>Use graphics acceleration when available</b>, then relaunch Chrome.',
+    'Open <code>chrome://gpu</code>. If WebGL says <b>Disabled</b>, go to <code>chrome://flags/#ignore-gpu-blocklist</code>, enable it and relaunch.',
+    'Close other tabs that show 3D, maps or video calls. Chrome only allows a limited number of 3D pages at once.');
+  if (isFirefox) steps.push('Open <code>about:config</code> and make sure <b>webgl.disabled</b> is false and <b>webgl.force-enabled</b> is true, then reload.');
+  if (isSafari) steps.push('In Safari, choose Safari, Settings, Advanced and turn on the Develop menu; then in Develop, Feature Flags make sure WebGL is enabled.');
+  steps.push('Try another browser: Safari, Firefox or a current Chrome all run this page.', 'On a laptop, plug in power or leave low-power mode; some systems switch the GPU off on battery.');
+  const rows = ROOMS.filter(r => r.w && r.d).map(r => `<tr><td>${r.name}</td><td>${fmt(r.w)} × ${fmt(r.d)} m</td><td>${(r.w * r.d).toFixed(1)} m²</td></tr>`).join('');
+  document.getElementById('loading').innerHTML = `<div class="nogl">
+    <h2>The 3D view could not start in this browser</h2>
+    <p>${isChrome ? 'Chrome' : isFirefox ? 'Firefox' : 'This browser'} refused to open a WebGL graphics context, which the walkthrough needs. The page itself is fine; the fix is in the browser settings.${reason ? ` <span class="why">Browser message: ${reason}</span>` : ''}</p>
+    <ol>${steps.map(s => `<li>${s}</li>`).join('')}</ol>
+    <p class="actions"><button type="button" onclick="location.reload()">Try again</button></p>
+    <div class="fallback">
+      <img src="plan.jpg" alt="Ground floor plan drawing" width="1447" height="1087">
+      <table><caption>Rooms and their internal sizes</caption>${rows}</table>
+    </div>
+  </div>`;
+}
+const made = createRenderer();
+if (!(made instanceof THREE.WebGLRenderer)) {
+  showNoWebGL(made.error);
+  throw new Error('WebGL unavailable: ' + made.error);
+}
+const renderer = made;
+// If the GPU drops the context later (sleep, GPU reset, too many tabs), say so instead of freezing on a blank canvas.
+renderer.domElement.addEventListener('webglcontextlost', e => {
+  e.preventDefault();
+  const l = document.getElementById('loading');
+  l.classList.remove('gone');
+  l.innerHTML = '<div class="nogl"><h2>The graphics context was interrupted</h2><p>The browser paused 3D drawing, usually after the computer slept or another 3D tab took over the graphics card.</p><p class="actions"><button type="button" onclick="location.reload()">Reload the walkthrough</button></p></div>';
+});
+renderer.domElement.addEventListener('webglcontextrestored', () => location.reload());
 renderer.setPixelRatio(Math.min(devicePixelRatio, isTouch ? 1.5 : 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
