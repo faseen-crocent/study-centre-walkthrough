@@ -1,0 +1,34 @@
+# Study Centre Walkthrough
+
+Interactive 3D walkthrough of a single-storey study centre in the
+Kerala vernacular, generated procedurally from its ground floor plan.
+
+## Files
+
+- `index.html` – the whole site: layout data, 3D model, controls and UI. No build step.
+- `plan.jpg` – the architect's original ground floor plan, shown in the Plan panel.
+
+## Run it
+
+Open `index.html` over any static server (module scripts and the plan image need HTTP):
+
+```sh
+python3 -m http.server 8765
+# then visit http://localhost:8765/
+```
+
+Three.js 0.160 is loaded from jsDelivr through an import map; fonts come from Google Fonts.
+
+## Edit the building
+
+Everything is driven by the `P` object and the `ROOMS` list near the top of the module
+script. Room rectangles, wall positions, the column grid, plot size and gate position all
+live there; the walls, roofs, floors, colliders, labels and the model plan are generated
+from those numbers.
+
+## Known deviation from the drawing
+
+The labelled room widths (5.78 + 2.40 + 5.06 + 5.06 + 1.50 m) add up to 19.80 m before
+any wall thickness, so they cannot fit inside the 19.02 m overall dimension on the
+drawing. The model keeps every room at its labelled size, which makes the building
+21.89 m long overall (12.10 m deep as drawn).
