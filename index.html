@@ -319,11 +319,11 @@ const sqm = (w, d) => `${(w * d).toFixed(1)} m² (${Math.round(w * d * 10.7639)}
 const ROOMS = [
   ...P.R.map((r, i) => ({ id: `room${i + 1}`, group: 'Study rooms', name: `Study room ${i + 1}`, kind: 'Classroom, west wing',
     w: 5.30, d: r[1] - r[0], y: FL, rects: [[P.LW.in1, r[0], P.LW.in2, r[1]]],
-    note: 'Opens onto the west corridor through a flush veneer door. A glazed sliding window with a safety grille and concrete sunshade faces the compound wall on the west; a second lights the corridor side.' })),
+    note: `Seats 16 on four four-seater desk-bench sets in two files, facing a green board on the ${i === 3 ? 'north' : 'south'} partition wall, with the teacher's table beside the board. Opens onto the west corridor through a flush veneer door; a glazed window with grille and sunshade faces west.` })),
   { id: 'hall1', group: 'Study halls', name: 'Study hall 1', kind: 'Main teaching hall', w: 5.06, d: 4.80, y: FL, rects: [[P.H1.x1, P.HZ.z1, P.H1.x2, P.HZ.z2]],
-    note: 'One of the two large halls at the heart of the centre. Structural columns sit on the grid along the north and south walls; glazed windows with sunshades face north, and a door and window open onto the south verandah.' },
+    note: 'Seats 32 on eight four-seater desk-bench sets, two files of four rows, facing a green board on the solid west wall with the teacher\'s table and chair beside it. Columns sit on the grid along the north and south walls; windows face north, and a door and window open onto the verandah.' },
   { id: 'hall2', group: 'Study halls', name: 'Study hall 2', kind: 'Main teaching hall', w: 5.06, d: 4.80, y: FL, rects: [[P.H2.x1, P.HZ.z1, P.H2.x2, P.HZ.z2]],
-    note: 'Twin of hall 1, linked to it through a wide door in the shared partition so the two can be used as one space for gatherings.' },
+    note: 'Twin of hall 1 with the same 32 seats, facing a green board on its solid east wall. Linked to hall 1 through a wide door in the shared partition, which opens onto the centre aisles of both rooms.' },
   { id: 'toilet1', group: 'Toilets', name: 'Toilet 1', kind: 'Toilet, east end', w: 1.50, d: 1.44, y: FL, rects: [[P.T.x1, P.T.rows[0][0], P.T.x2, P.T.rows[0][1]]],
     note: 'Entered from the covered east passage, keeping toilet doors out of the study halls.' },
   { id: 'toilet2', group: 'Toilets', name: 'Toilet 2', kind: 'Toilet, east end', w: 1.50, d: 1.44, y: FL, rects: [[P.T.x1, P.T.rows[1][0], P.T.x2, P.T.rows[1][1]]],
@@ -578,6 +578,7 @@ const MAT = {
   grille: new THREE.MeshStandardMaterial({ color: '#2b2e31', roughness: .4, metalness: .6 }),
   glass: new THREE.MeshStandardMaterial({ color: '#9cc3cc', transparent: true, opacity: .42, roughness: .08, metalness: 0, side: THREE.DoubleSide, depthWrite: false }),
   chrome: new THREE.MeshStandardMaterial({ color: '#cfd3d6', roughness: .25, metalness: .9 }),
+  board: new THREE.MeshStandardMaterial({ color: '#1f3d31', roughness: .95 }),
 };
 
 /* =====================================================================
@@ -858,10 +859,12 @@ function build() {
   box(PORCH.x1, 0, PORCH.z1, PORCH.x2 + .3, FL - .2, PORCH.z2 + .3, 'laterite', { floor: true });
   box(PORCH.x1, 0, PORCH.z1, PORCH.x2 + .6, FL - .4, PORCH.z2 + .6, 'laterite', { floor: true });
 
-  /* ---- simple furniture: low reading desks and mats in the halls, one bookshelf per room ---- */
-  const desk = (x, z, rot) => { const g = boxGeo(-.32, .18, -.2, .32, .22, .2); g.rotateY(rot); g.translate(x, FL, z); add(g, 'timberDark'); const l = boxGeo(-.3, 0, -.18, .3, .18, -.15); l.rotateY(rot); l.translate(x, FL, z); add(l, 'timberDark'); const m = boxGeo(-.45, 0, .05, .45, .015, .95); m.rotateY(rot); m.translate(x, FL + .02, z); add(m, 'fabric'); };
-  for (const h of [H1, H2]) for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) desk(h.x1 + 1.0 + i * 1.5, HZ.z1 + 1.0 + j * 1.35, 0);
-  for (const r of R) { box(LW.in1 + .02, FL, r[0] + .2, LW.in1 + .35, FL + 1.9, r[0] + 1.6, 'timberDark', { collide: true }); for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) desk(LW.in1 + 1.6 + i * 1.5, r[0] + .75 + j * 1.2, 0); }
+  /* ---- classrooms: Kerala school desk-bench sets facing a green board, teacher's table, ceiling fans ----
+     Halls face their solid end walls (two files of four sets, 32 seats); the shallow study rooms face a
+     partition wall (two files of two sets, 16 seats).  The wider aisle is on the door side.           */
+  classroom({ rect: [H1.x1, HZ.z1, H1.x2, HZ.z2], facing: 'W', rows: 4, pitch: .95, files: [-1.45, .9], teacherL: -1.5, table: [1.2, .6] });
+  classroom({ rect: [H2.x1, HZ.z1, H2.x2, HZ.z2], facing: 'E', rows: 4, pitch: .95, files: [-1.45, .9], teacherL: -1.5, table: [1.2, .6] });
+  R.forEach((r, i) => classroom({ rect: [LW.in1, r[0], LW.in2, r[1]], facing: i === 3 ? 'N' : 'S', rows: 2, pitch: .9, files: [-1.45, 1.05], teacherL: -1.9, table: [1.0, .5] }));
 
   /* ---- site ---- */
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(160, 160, 1, 1), MAT.grass);
@@ -884,6 +887,58 @@ function build() {
   for (const [x, z] of [[11.5, 15.9], [14, 16], [19, 16], [22.5, 16], [24.5, 8], [24.5, 12]]) { const g = new THREE.IcosahedronGeometry(.55 + rnd() * .3, 1); g.scale(1, .75, 1); g.translate(x, .4, z); add(g, 'leaf2'); }
 }
 function triShape(pts) { const s = new THREE.Shape(); s.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) s.lineTo(pts[i][0], pts[i][1]); s.closePath(); return s; }
+
+/* ---- classroom furniture ----
+   Dimensions follow the common Indian school specification for a four-seater set:
+   desk 1800 × 378 × 750 mm, bench 1800 × 335 × 437 mm, backrest 265 mm, pair 850 mm deep,
+   MS tube frame with a book shelf and a front modesty panel.  Board bottom at 800 mm (IS 8827). */
+function classroom(c) {
+  const [x1, z1, x2, z2] = c.rect, f = c.facing, xc = (x1 + x2) / 2, zc = (z1 + z2) / 2;
+  const depth = (f === 'W' || f === 'E') ? x2 - x1 : z2 - z1;
+  // local (l, d): l lateral from the room centre, d distance from the board wall
+  const W = (l, d) => f === 'W' ? [x1 + d, zc + l] : f === 'E' ? [x2 - d, zc + l] : f === 'S' ? [xc + l, z2 - d] : [xc + l, z1 + d];
+  const LB = (l0, d0, y0, l1, d1, y1, key, o) => { const [ax, az] = W(l0, d0), [bx, bz] = W(l1, d1); box(Math.min(ax, bx), FL + y0, Math.min(az, bz), Math.max(ax, bx), FL + y1, Math.max(az, bz), key, o); };
+  // green board 2.4 × 1.2 with timber frame and chalk tray
+  LB(-1.2, 0, .8, 1.2, .03, 2.0, 'board');
+  LB(-1.25, 0, .75, 1.25, .04, .8, 'timber'); LB(-1.25, 0, 2.0, 1.25, .04, 2.05, 'timber');
+  LB(-1.25, 0, .75, -1.2, .04, 2.05, 'timber'); LB(1.2, 0, .75, 1.25, .04, 2.05, 'timber');
+  LB(-1.2, 0, .70, 1.2, .1, .75, 'timber');
+  // desk-bench sets
+  const front = depth - c.rows * c.pitch;
+  for (let k = 0; k < c.rows; k++) for (const lc of c.files) deskBench(LB, lc, front + k * c.pitch);
+  // teacher's table facing the class, chair between it and the board
+  const [tl, td] = c.table, L = c.teacherL, d0 = front > 1.2 ? .6 : .38;
+  LB(L - tl / 2, d0, .72, L + tl / 2, d0 + td, .75, 'timberDark', { collide: true });
+  LB(L - tl / 2, d0 + td - .03, .25, L + tl / 2, d0 + td, .72, 'timberDark');
+  for (const s of [-1, 1]) LB(L + s * (tl / 2 - .03) - .025, d0 + .02, 0, L + s * (tl / 2 - .03) + .025, d0 + td - .05, .72, 'timberDark');
+  const cd = Math.max(.02, d0 - .42);
+  LB(L - .22, cd, .43, L + .22, cd + .42, .46, 'timberDark');
+  LB(L - .22, cd, .46, L + .22, cd + .04, .78, 'timberDark');
+  for (const [sl, sd] of [[-.2, .02], [.2, .02], [-.2, .38], [.2, .38]]) LB(L + sl - .02, cd + sd - .02, 0, L + sl + .02, cd + sd + .02, .43, 'timberDark');
+  // two ceiling fans
+  for (const l of [-1.3, 1.3]) { const [fx, fz] = W(l, depth * .55); fan(fx, fz); }
+}
+function deskBench(LB, lc, d0) {
+  const h = .9, F = 'grille';
+  LB(lc - h, d0, .72, lc + h, d0 + .378, .75, 'timber', { collide: true });      // desk top
+  LB(lc - h, d0, .57, lc + h, d0 + .02, .72, F);                                  // modesty panel
+  LB(lc - h + .03, d0 + .06, .45, lc + h - .03, d0 + .36, .47, F);                // book shelf
+  LB(lc - h, d0 + .515, .41, lc + h, d0 + .85, .437, 'timber', { collide: true }); // bench seat
+  LB(lc - h, d0 + .83, .55, lc + h, d0 + .856, .70, 'timber');                    // backrest
+  for (const s of [-1, 1]) {
+    const l = lc + s * (h - .03);
+    for (const d of [.03, .34]) LB(l - .013, d0 + d, 0, l + .013, d0 + d + .026, .72, F);   // desk legs
+    LB(l - .013, d0 + .03, .06, l + .013, d0 + .366, .085, F);                              // desk foot rail
+    for (const d of [.55, .80]) LB(l - .013, d0 + d, 0, l + .013, d0 + d + .026, .41, F);   // bench legs
+    LB(l - .013, d0 + .55, .06, l + .013, d0 + .826, .085, F);                              // bench foot rail
+    LB(l - .013, d0 + .83, .41, l + .013, d0 + .856, .70, F);                               // backrest upright
+  }
+}
+function fan(x, z) {
+  const g = new THREE.CylinderGeometry(.012, .012, .36, 8); g.translate(x, CEIL - .18, z); add(g, 'dome');
+  const m = new THREE.CylinderGeometry(.09, .09, .14, 16); m.translate(x, CEIL - .43, z); add(m, 'dome');
+  for (let i = 0; i < 3; i++) { const b = boxGeo(.09, -.007, -.055, .68, .007, .055); b.rotateY(i * Math.PI * 2 / 3 + .4); b.translate(x, CEIL - .5, z); add(b, 'dome'); }
+}
 
 /* ---- everything that depends on the roof type: supports, lean-tos, main roofs, terrace ---- */
 function buildRoof(type) {
@@ -1102,7 +1157,7 @@ function focusRoom(r) {
 
 function groundAt(x, z) { let y = 0; for (const list of [floors, dynFloors]) for (const f of list) if (x >= f.x1 && x <= f.x2 && z >= f.z1 && z <= f.z2 && f.y > y) y = f.y; return y; }
 function collide(x, z, feet) {
-  const r = .32;
+  const r = .25;   // shoulder half-width; classroom aisles are 0.55 m and wider
   for (let it = 0; it < 3; it++) for (const list of [colliders, dynColliders]) for (const c of list) {
     if (c.y0 > feet + 1.6 || c.y1 < feet + .25) continue;
     const cx = Math.max(c.x1, Math.min(x, c.x2)), cz = Math.max(c.z1, Math.min(z, c.z2));
