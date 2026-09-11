@@ -212,7 +212,7 @@ button:focus-visible,.pr:focus-visible{outline:2px solid var(--turmeric-2);outli
     </div>
     <div class="tools">
       <button id="tPlan" aria-pressed="true" title="Show the floor plan"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 12h9M12 3v18M12 15h9"/></svg><span class="t">Plan</span></button>
-      <button id="tLabels" aria-pressed="true" title="Show room labels"><svg viewBox="0 0 24 24"><path d="M4 6h12l4 6-4 6H4z"/></svg><span class="t">Labels</span></button>
+      <button id="tLabels" aria-pressed="false" title="Show room labels"><svg viewBox="0 0 24 24"><path d="M4 6h12l4 6-4 6H4z"/></svg><span class="t">Labels</span></button>
       <div class="menu">
         <button id="tRoof" aria-haspopup="menu" aria-expanded="false" title="Roof type"><svg viewBox="0 0 24 24"><path d="M2 12 12 4l10 8M5 10v10h14V10"/></svg><span class="t">Roof</span></button>
         <div id="roofMenu" role="menu" aria-label="Roof type" hidden>
@@ -369,7 +369,7 @@ const ROOF_TYPES = {
   flat:    { name: 'Flat concrete terrace',      desc: 'RCC slab with parapets all round; the whole roof is a usable terrace', flat: true },
   truss:   { name: 'Truss with metal sheets',    desc: 'Flat slab below, steel truss with colour-coated profiled sheets above', flat: true },
 };
-let roofType = 'tile';
+let roofType = 'flat';
 
 /* =====================================================================
    2. RENDERER, SCENE, LIGHT
@@ -1235,7 +1235,8 @@ let planOn = !matchMedia('(max-width: 860px)').matches;
 function setPlan(on) { planOn = on; tPlan.setAttribute('aria-pressed', on); if (document.body.classList.contains('narrow')) { if (on) { document.body.classList.remove('collapsed'); showTab('plan'); } else showTab('rooms'); } else planEl.hidden = !on; }
 tPlan.addEventListener('click', () => setPlan(!planOn));
 document.getElementById('pClose').addEventListener('click', () => setPlan(false));
-let labelsOn = true;
+let labelsOn = false;
+tLabels.setAttribute('aria-pressed', 'false'); labelsLayer.classList.add('off');
 tLabels.addEventListener('click', () => { labelsOn = !labelsOn; tLabels.setAttribute('aria-pressed', labelsOn); labelsLayer.classList.toggle('off', !labelsOn); });
 /* ---- roof menu: type radio items plus the lift toggle ---- */
 const roofMenu = document.getElementById('roofMenu'), tLift = document.getElementById('tLift');
