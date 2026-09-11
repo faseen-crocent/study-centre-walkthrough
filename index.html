@@ -319,9 +319,9 @@ const sqm = (w, d) => `${(w * d).toFixed(1)} m² (${Math.round(w * d * 10.7639)}
 const ROOMS = [
   ...P.R.map((r, i) => ({ id: `room${i + 1}`, group: 'Study rooms', name: `Study room ${i + 1}`, kind: 'Classroom, west wing',
     w: 5.30, d: r[1] - r[0], y: FL, rects: [[P.LW.in1, r[0], P.LW.in2, r[1]]],
-    note: 'Opens onto the west corridor through a timber door. A barred window faces the compound wall on the west; a second lights the corridor side.' })),
+    note: 'Opens onto the west corridor through a flush veneer door. A glazed sliding window with a safety grille and concrete sunshade faces the compound wall on the west; a second lights the corridor side.' })),
   { id: 'hall1', group: 'Study halls', name: 'Study hall 1', kind: 'Main teaching hall', w: 5.06, d: 4.80, y: FL, rects: [[P.H1.x1, P.HZ.z1, P.H1.x2, P.HZ.z2]],
-    note: 'One of the two large halls at the heart of the centre. Structural columns sit on the grid along the north and south walls; a door and window open onto the south verandah.' },
+    note: 'One of the two large halls at the heart of the centre. Structural columns sit on the grid along the north and south walls; glazed windows with sunshades face north, and a door and window open onto the south verandah.' },
   { id: 'hall2', group: 'Study halls', name: 'Study hall 2', kind: 'Main teaching hall', w: 5.06, d: 4.80, y: FL, rects: [[P.H2.x1, P.HZ.z1, P.H2.x2, P.HZ.z2]],
     note: 'Twin of hall 1, linked to it through a wide door in the shared partition so the two can be used as one space for gatherings.' },
   { id: 'toilet1', group: 'Toilets', name: 'Toilet 1', kind: 'Toilet, east end', w: 1.50, d: 1.44, y: FL, rects: [[P.T.x1, P.T.rows[0][0], P.T.x2, P.T.rows[0][1]]],
@@ -545,6 +545,12 @@ const TEX = {
   paving: canvasTex(512, (c, s) => { c.fillStyle = '#8f8570'; c.fillRect(0, 0, s, s); const n = 2; for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) { c.fillStyle = pick(['#bcb09a', '#b3a791', '#c2b6a0', '#aea28c']); c.fillRect(i * s / n + 4, j * s / n + 4, s / n - 8, s / n - 8); } speckle(c, s, 3000, ['#9c9079', '#d0c5b0'], .08, .25, 1, 4); }),
   concrete: canvasTex(256, (c, s) => { c.fillStyle = '#b3ada1'; c.fillRect(0, 0, s, s); speckle(c, s, 2500, ['#a49e92', '#c2bcb0', '#9a9488'], .1, .3, 1, 3); }),
   road: canvasTex(512, (c, s) => { c.fillStyle = '#5f5d59'; c.fillRect(0, 0, s, s); speckle(c, s, 5000, ['#54524e', '#6c6a66', '#48463f'], .15, .4, 1, 3); }),
+  flush: canvasTex(256, (c, s) => {   // flush veneer door: warm teak with horizontal grooves every 0.5 m
+    c.fillStyle = '#8a5a34'; c.fillRect(0, 0, s, s);
+    for (let i = 0; i < 120; i++) { c.globalAlpha = .1 + rnd() * .25; c.fillStyle = pick(['#764a28', '#9a6a40', '#6b401f', '#a5764c']); c.fillRect(rnd() * s, 0, 1 + rnd() * 3, s); }
+    c.globalAlpha = 1; c.fillStyle = 'rgba(40,20,8,.7)'; c.fillRect(0, 0, s, 4); c.fillRect(0, s / 2, s, 4);
+    c.fillStyle = 'rgba(255,230,200,.18)'; c.fillRect(0, 4, s, 2); c.fillRect(0, s / 2 + 4, s, 2);
+  }),
   sheet: canvasTex(512, (c, s) => {   // colour-coated profiled steel sheet, ribs every 0.1 m
     c.fillStyle = '#8f3d30'; c.fillRect(0, 0, s, s);
     const n = 10, w = s / n;
@@ -567,6 +573,11 @@ const MAT = {
   sheet: std(TEX.sheet, { roughness: .5, metalness: .3 }), sheetRidge: new THREE.MeshStandardMaterial({ color: '#742f24', roughness: .5, metalness: .3 }),
   sheetUnder: new THREE.MeshStandardMaterial({ color: '#a6aaad', roughness: .55, metalness: .35 }),
   steel: new THREE.MeshStandardMaterial({ color: '#4d5a66', roughness: .5, metalness: .6 }),
+  flush: std(TEX.flush, { roughness: .5 }),
+  frame: new THREE.MeshStandardMaterial({ color: '#45484c', roughness: .45, metalness: .4 }),
+  grille: new THREE.MeshStandardMaterial({ color: '#2b2e31', roughness: .4, metalness: .6 }),
+  glass: new THREE.MeshStandardMaterial({ color: '#9cc3cc', transparent: true, opacity: .42, roughness: .08, metalness: 0, side: THREE.DoubleSide, depthWrite: false }),
+  chrome: new THREE.MeshStandardMaterial({ color: '#cfd3d6', roughness: .25, metalness: .9 }),
 };
 
 /* =====================================================================
@@ -698,9 +709,10 @@ function hipRoof(x1, z1, x2, z2, ye, pitch, o = {}) {
 }
 
 /* ---------- walls with openings ---------- */
+// ext: which face of the wall is outside (+1 = larger coordinate side), shade: add a concrete sunshade there
 const door = (at, w, swing, h = 2.1) => ({ at, w, kind: 'door', sill: 0, head: h, swing });
-const win = (at, w, sill = 0.9, head = 2.25) => ({ at, w, kind: 'window', sill, head });
-const vent = (at, w = 0.6) => ({ at, w, kind: 'vent', sill: 2.1, head: 2.55 });
+const win = (at, w, sill = 0.9, head = 2.25, o = {}) => ({ at, w, kind: 'window', sill, head, ext: o.ext ?? 1, shade: o.shade ?? true });
+const vent = (at, w = 0.6, o = {}) => ({ at, w, kind: 'vent', sill: 2.1, head: 2.55, ext: o.ext ?? 1, shade: o.shade ?? true });
 
 function wall({ x1, x2, z1, z2, y0 = FL, y1 = WTOP, key = 'plasterExt', openings = [], collide = true, plan = true, bucket = 'main' }) {
   const alongX = (x2 - x1) >= (z2 - z1);
@@ -726,24 +738,41 @@ function wall({ x1, x2, z1, z2, y0 = FL, y1 = WTOP, key = 'plasterExt', openings
   seg(cur, a1, y0, y1, true);
 }
 function detail(op, alongX, o0, o1, sill, head, [t0, t1], bucket) {
-  const f = 0.06, key = op.kind === 'door' ? 'timberDark' : 'timber';
-  const B = (a0, y0, a1, y1, tt0 = t0 - .012, tt1 = t1 + .012) => alongX ? box(a0, y0, tt0, a1, y1, tt1, key, { bucket }) : box(tt0, y0, a0, tt1, y1, a1, key, { bucket });
-  // frame
-  B(o0 - f, sill, o0, head + f); B(o1, sill, o1 + f, head + f); B(o0 - f, head, o1 + f, head + f);
-  if (op.kind === 'window' || op.kind === 'vent') {
-    B(o0 - f, sill - f, o1 + f, sill, t0 - .05, t1 + .012);                    // sill ledge
-    const n = op.kind === 'vent' ? 2 : 3, tm = (t0 + t1) / 2;
-    for (let i = 1; i <= n; i++) { const a = o0 + (o1 - o0) * i / (n + 1); B(a - .015, sill, a + .015, head, tm - .015, tm + .015); }
-    if (op.kind === 'window') B(o0, (sill + head) / 2 - .02, o1, (sill + head) / 2 + .02, tm - .03, tm + .03);
-  } else if (op.kind === 'door') {
-    // a leaf swung ~80° into the room so the doorway reads as a doorway
-    const hingeA = o0 + .035, leafW = (o1 - o0) - .07, leafH = head - sill - .03;
+  const tm = (t0 + t1) / 2;
+  const B = (a0, y0, a1, y1, tt0, tt1, key) => alongX ? box(a0, y0, tt0, a1, y1, tt1, key, { bucket }) : box(tt0, y0, a0, tt1, y1, a1, key, { bucket });
+  if (op.kind === 'door') {
+    // slim timber frame, flush veneer leaf swung ~80° into the room, stainless lever handle
+    const f = .05;
+    B(o0 - f, sill, o0, head + f, t0 - .01, t1 + .01, 'timberDark'); B(o1, sill, o1 + f, head + f, t0 - .01, t1 + .01, 'timberDark'); B(o0 - f, head, o1 + f, head + f, t0 - .01, t1 + .01, 'timberDark');
+    const hingeA = o0 + .03, leafW = (o1 - o0) - .06, leafH = head - sill - .02;
     const ax = alongX ? AX : AZ, nz = alongX ? AZ : AX;
     const tSide = op.swing > 0 ? t1 - .02 : t0 + .02;
     const p0 = alongX ? V3(hingeA, sill + leafH / 2, tSide) : V3(tSide, sill + leafH / 2, hingeA);
-    const dir = ax.clone().multiplyScalar(Math.cos(80 * DEG)).add(nz.clone().multiplyScalar(op.swing * Math.sin(80 * DEG)));
-    bar(p0, p0.clone().add(dir.multiplyScalar(leafW)), .045, leafH, 'timberDark', bucket);
+    const dir = ax.clone().multiplyScalar(Math.cos(80 * DEG)).add(nz.clone().multiplyScalar(op.swing * Math.sin(80 * DEG))).normalize();
+    bar(p0, p0.clone().add(dir.clone().multiplyScalar(leafW)), .045, leafH, 'flush', bucket);
+    const nrm = V3(-dir.z, 0, dir.x);
+    const stem = p0.clone().add(dir.clone().multiplyScalar(leafW - .09)); stem.y = sill + 1.02;
+    bar(stem.clone().add(nrm.clone().multiplyScalar(.02)), stem.clone().add(nrm.clone().multiplyScalar(.07)), .022, .022, 'chrome', bucket);
+    const lever = stem.clone().add(nrm.clone().multiplyScalar(.07));
+    bar(lever, lever.clone().add(dir.clone().multiplyScalar(-.13)), .018, .018, 'chrome', bucket);
+    return;
   }
+  // modern window: anthracite aluminium frame inside the reveal, tinted glass, mullion and top light,
+  // slender safety grille outside, concrete sill, concrete sunshade on external walls
+  const f = .05, ft0 = tm - .035, ft1 = tm + .035, ext = op.ext;
+  B(o0, sill, o0 + f, head, ft0, ft1, 'frame'); B(o1 - f, sill, o1, head, ft0, ft1, 'frame');
+  B(o0, head - f, o1, head, ft0, ft1, 'frame'); B(o0, sill, o1, sill + f, ft0, ft1, 'frame');
+  B(o0 + f, sill + f, o1 - f, head - f, tm - .004, tm + .004, 'glass');
+  if (op.kind === 'window') {
+    const m = (o0 + o1) / 2, tr = head - .45;
+    B(m - .02, sill, m + .02, head, ft0, ft1, 'frame'); B(o0, tr - .02, o1, tr + .02, ft0, ft1, 'frame');
+  }
+  const g0 = ext > 0 ? t1 + .03 : t0 - .045, g1 = g0 + .015;
+  const n = Math.max(2, Math.round((o1 - o0) / .13) - 1);
+  for (let i = 1; i <= n; i++) { const a = o0 + (o1 - o0) * i / (n + 1); B(a - .0075, sill + .03, a + .0075, head - .03, g0, g1, 'grille'); }
+  for (const y of [sill + .08, head - .08]) B(o0 + .01, y - .0075, o1 - .01, y + .0075, g0, g1, 'grille');
+  B(o0 - .08, sill - .06, o1 + .08, sill, ext > 0 ? t0 : t0 - .06, ext > 0 ? t1 + .06 : t1, 'concrete');
+  if (op.shade) B(o0 - .2, head + .08, o1 + .2, head + .18, ext > 0 ? t1 : t0 - .5, ext > 0 ? t1 + .5 : t0, 'concrete');
 }
 
 /* =====================================================================
@@ -771,11 +800,11 @@ function build() {
   box(T.x1, CEIL, 0.24, T.x2, CEIL + .08, HZ.z2, 'plasterIn', { bucket: 'ceil' });
 
   /* ---- west wing ---- */
-  wall({ x1: 0, x2: EXT, z1: 0, z2: D, openings: R.map(r => win(zc(r), 1.5)) });                                   // west wall
-  wall({ x1: 0, x2: ST.x2, z1: 0, z2: EXT, openings: [win(2.89, 1.5)] });                                          // north wall (wing + core)
+  wall({ x1: 0, x2: EXT, z1: 0, z2: D, openings: R.map(r => win(zc(r), 1.5, .9, 2.25, { ext: -1 })) });             // west wall
+  wall({ x1: 0, x2: ST.x2, z1: 0, z2: EXT, openings: [win(2.89, 1.5, .9, 2.25, { ext: -1 })] });                    // north wall (wing + core)
   wall({ x1: 0, x2: V.x1, z1: 11.86, z2: D, openings: [win(2.89, 1.5)] });                                         // south wall
   wall({ x1: V.x1, x2: V.x2, z1: 11.86, z2: D, y1: BEAM_TOP, openings: [win(6.38, 0.8, 1.0, 2.0)] });               // corridor end wall (top part depends on the roof)
-  wall({ x1: LW.in2, x2: V.x1, z1: 0, z2: 11.86, openings: R.flatMap(r => [door(zc(r) + .55, 1.0, -1), win(zc(r) - .6, 1.0)]) }); // corridor wall
+  wall({ x1: LW.in2, x2: V.x1, z1: 0, z2: 11.86, openings: R.flatMap(r => [door(zc(r) + .55, 1.0, -1), win(zc(r) - .6, 1.0, .9, 2.25, { shade: false })]) }); // corridor wall
   for (let i = 0; i < 3; i++) wall({ x1: LW.in1, x2: LW.in2, z1: R[i][1], z2: R[i + 1][0], y1: CEIL, key: 'plasterIn' });
 
   /* ---- stair core ---- */
@@ -790,14 +819,14 @@ function build() {
   for (let i = 0; i < nT; i += 2) { const z = ST.zBot - (i + .5) * tread, y = FL + (i + 1) * rise; box(ST.x1 + .04, y, z - .02, ST.x1 + .08, y + .95, z + .02, 'timber'); }
 
   /* ---- halls and toilets ---- */
-  wall({ x1: ST.x2, x2: T.x1, z1: 0, z2: HN, openings: [9.62, 12.26, 14.875, 17.5].map(x => win(x, 1.5)) });          // north wall, thicker
-  wall({ x1: T.x1, x2: E.x1, z1: 0, z2: EXT, openings: [vent(19.7)] });
+  wall({ x1: ST.x2, x2: T.x1, z1: 0, z2: HN, openings: [9.62, 12.26, 14.875, 17.5].map(x => win(x, 1.5, .9, 2.25, { ext: -1 })) });   // north wall, thicker
+  wall({ x1: T.x1, x2: E.x1, z1: 0, z2: EXT, openings: [vent(19.7, .6, { ext: -1 })] });
   wall({ x1: E.x1, x2: E.x2, z1: 0, z2: EXT, y1: BEAM_TOP });                                                           // passage end wall (top depends on the roof)
   wall({ x1: H1.x2, x2: H2.x1, z1: HZ.z1, z2: HZ.z2, y1: CEIL, key: 'plasterIn', openings: [door(2.72, 1.5, 1)] });     // shared partition
   wall({ x1: H2.x2, x2: T.x1, z1: 0.24, z2: HZ.z2, y1: CEIL, key: 'plasterIn' });
   for (let i = 0; i < 2; i++) wall({ x1: T.x1, x2: T.x2, z1: T.rows[i][1], z2: T.rows[i + 1][0], y1: CEIL, key: 'plasterIn' });
   wall({ x1: T.x2, x2: E.x1, z1: 0.24, z2: HZ.z2, openings: [door(0.96, 0.75, -1), door(2.5, 0.75, -1), door(4.22, 0.9, -1)] });
-  wall({ x1: ST.x2, x2: E.x1, z1: HZ.z2, z2: HV.z1, openings: [win(9.62, 1.5), door(12.26, 1.2, -1), door(14.875, 1.2, -1), win(17.5, 1.5)] });
+  wall({ x1: ST.x2, x2: E.x1, z1: HZ.z2, z2: HV.z1, openings: [win(9.62, 1.5, .9, 2.25, { shade: false }), door(12.26, 1.2, -1), door(14.875, 1.2, -1), win(17.5, 1.5, .9, 2.25, { shade: false })] });
   for (const x of P.COL_X) {
     box(x - .18, FL, -.04, x + .18, WTOP, HN + .04, 'plasterExt', { plan: true });
     box(x - .18, FL, HZ.z2 - .04, x + .18, WTOP, HV.z1 + .04, 'plasterExt', { plan: true });
@@ -1000,7 +1029,7 @@ function mergeBucket(bucket, group) {
   const meshes = [];
   for (const [key, geos] of Object.entries(bucket)) {
     const mesh = new THREE.Mesh(mergeGeometries(geos, false), MAT[key]);
-    mesh.castShadow = true; mesh.receiveShadow = true;
+    mesh.castShadow = key !== 'glass'; mesh.receiveShadow = true;
     group.add(mesh); meshes.push(mesh); geos.forEach(g => g.dispose());
   }
   return meshes;

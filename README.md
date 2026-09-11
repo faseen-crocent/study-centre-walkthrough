@@ -34,6 +34,15 @@ concrete terrace with parapets, and a flat slab with a steel truss and metal she
 Verandah supports, the roof terrace and walk-mode floors follow the choice. Add a type by
 extending `ROOF_TYPES` and `buildRoof()`.
 
+## Doors and windows
+
+Openings are declared per wall with `door()`, `win()` and `vent()`. Windows are drawn as
+anthracite aluminium frames with tinted glass, a central mullion and top light, a slender
+steel safety grille on the outside face (`ext: -1` or `1` says which face is outside) and a
+concrete sill; external walls also get a projecting concrete sunshade (`shade: false` turns
+it off for windows under the verandah). Doors are flush veneer leaves with a lever handle,
+shown swung open so the interiors read.
+
 ## Known deviation from the drawing
 
 The labelled room widths (5.78 + 2.40 + 5.06 + 5.06 + 1.50 m) add up to 19.80 m before
