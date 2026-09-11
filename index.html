@@ -42,7 +42,21 @@ button:focus-visible,.pr:focus-visible{outline:2px solid var(--turmeric-2);outli
 .seg button[aria-pressed="true"]{background:var(--lime);color:var(--ink)}
 .tools{display:flex;gap:6px}
 .tools button{padding:7px 11px;border:1px solid var(--line);border-radius:var(--radius);color:var(--lime-2);display:flex;gap:7px;align-items:center}
-.tools button[aria-pressed="true"]{border-color:var(--turmeric);color:var(--turmeric-2)}
+.tools button[aria-pressed="true"],.tools button[aria-expanded="true"]{border-color:var(--turmeric);color:var(--turmeric-2)}
+.menu{position:relative}
+#roofMenu{position:absolute;right:0;top:calc(100% + 8px);width:330px;background:var(--ink-glass);border:1px solid var(--line);border-radius:var(--radius);padding:6px;
+  backdrop-filter:blur(10px);z-index:40;box-shadow:0 12px 32px rgba(10,25,20,.35)}
+#roofMenu[hidden]{display:none}
+#roofMenu .mh{padding:8px 10px 6px;font-size:11.5px;color:var(--mute)}
+#roofMenu button{display:block;width:100%;text-align:left;padding:8px 10px 8px 30px;border-radius:4px;color:var(--lime-2);position:relative}
+#roofMenu button b{display:block;font-weight:500;color:var(--lime)}
+#roofMenu button small{display:block;font-size:11.5px;color:var(--mute);line-height:1.35;margin-top:2px}
+#roofMenu button:hover{background:rgba(241,235,220,.06)}
+#roofMenu button[aria-checked="true"]{background:rgba(217,166,60,.14)}
+#roofMenu button::before{content:"";position:absolute;left:11px;top:14px;width:9px;height:9px;border-radius:50%;border:1.5px solid var(--mute)}
+#roofMenu button[role="menuitemcheckbox"]::before{border-radius:2px}
+#roofMenu button[aria-checked="true"]::before{background:var(--turmeric);border-color:var(--turmeric)}
+#roofMenu .sep{height:1px;background:var(--line);margin:6px 4px}
 .tools svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .tools .t{display:inline}
 
@@ -158,6 +172,7 @@ button:focus-visible,.pr:focus-visible{outline:2px solid var(--turmeric-2);outli
   .tools .t{display:none}
   .tools button{padding:7px 9px}
   #bar{gap:8px;padding:0 12px}
+  #roofMenu{position:fixed;left:12px;right:12px;top:calc(var(--bar) + 8px);width:auto}
   .panel{top:auto;bottom:0;left:0;right:0;width:auto;height:44dvh;border-radius:12px 12px 0 0;border-bottom:0}
   #plan{width:auto}
   #rooms{padding-top:40px}
@@ -198,7 +213,14 @@ button:focus-visible,.pr:focus-visible{outline:2px solid var(--turmeric-2);outli
     <div class="tools">
       <button id="tPlan" aria-pressed="true" title="Show the floor plan"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 12h9M12 3v18M12 15h9"/></svg><span class="t">Plan</span></button>
       <button id="tLabels" aria-pressed="true" title="Show room labels"><svg viewBox="0 0 24 24"><path d="M4 6h12l4 6-4 6H4z"/></svg><span class="t">Labels</span></button>
-      <button id="tRoof" aria-pressed="true" title="Show or lift the roofs"><svg viewBox="0 0 24 24"><path d="M2 12 12 4l10 8M5 10v10h14V10"/></svg><span class="t">Roof</span></button>
+      <div class="menu">
+        <button id="tRoof" aria-haspopup="menu" aria-expanded="false" title="Roof type"><svg viewBox="0 0 24 24"><path d="M2 12 12 4l10 8M5 10v10h14V10"/></svg><span class="t">Roof</span></button>
+        <div id="roofMenu" role="menu" aria-label="Roof type" hidden>
+          <div class="mh">Roof type, as built in Kerala today</div>
+          <div class="sep"></div>
+          <button type="button" id="tLift" role="menuitemcheckbox" aria-checked="false"><b>Lift the roof off</b><small>Look straight down into the rooms</small></button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -330,6 +352,24 @@ const ROOMS = [
 ];
 const roomById = Object.fromEntries(ROOMS.map(r => [r.id, r]));
 for (const id of ['toilet1', 'toilet2', 'toilet3', 'store', 'terrace', 'stair']) roomById[id].minor = true;
+
+// verandah post positions (three runs along the open edges)
+const runPts = (x0, z0, x1, z1, n) => Array.from({ length: n + 1 }, (_, i) => [x0 + (x1 - x0) * i / n, z0 + (z1 - z0) * i / n]);
+const POSTS = [
+  ...runPts(P.V.x2 - .12, P.PORCH.z2 + .35, P.V.x2 - .12, 11.74, 1),
+  ...runPts(P.PORCH.x2 + .35, P.HV.z2 - .12, P.E.x1 - .05, P.HV.z2 - .12, 5),
+  ...runPts(P.E.x2 - .12, .40, P.E.x2 - .12, P.HV.z2 - .12, 3),
+];
+
+// Roof types seen on new institutional buildings in Kerala.  'flat' types turn the
+// whole roof into a terrace; the others keep a small terrace between two slopes.
+const ROOF_TYPES = {
+  tile:    { name: 'Clay tile roof',            desc: 'Mangalore tiles on timber, 30° pitch, deep eaves, timber posts', flat: false },
+  rcctile: { name: 'Sloped concrete, tile clad', desc: 'RCC slab at 25° with clay tiles fixed on top, plastered eaves, concrete columns', flat: false },
+  flat:    { name: 'Flat concrete terrace',      desc: 'RCC slab with parapets all round; the whole roof is a usable terrace', flat: true },
+  truss:   { name: 'Truss with metal sheets',    desc: 'Flat slab below, steel truss with colour-coated profiled sheets above', flat: true },
+};
+let roofType = 'tile';
 
 /* =====================================================================
    2. RENDERER, SCENE, LIGHT
@@ -505,6 +545,12 @@ const TEX = {
   paving: canvasTex(512, (c, s) => { c.fillStyle = '#8f8570'; c.fillRect(0, 0, s, s); const n = 2; for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) { c.fillStyle = pick(['#bcb09a', '#b3a791', '#c2b6a0', '#aea28c']); c.fillRect(i * s / n + 4, j * s / n + 4, s / n - 8, s / n - 8); } speckle(c, s, 3000, ['#9c9079', '#d0c5b0'], .08, .25, 1, 4); }),
   concrete: canvasTex(256, (c, s) => { c.fillStyle = '#b3ada1'; c.fillRect(0, 0, s, s); speckle(c, s, 2500, ['#a49e92', '#c2bcb0', '#9a9488'], .1, .3, 1, 3); }),
   road: canvasTex(512, (c, s) => { c.fillStyle = '#5f5d59'; c.fillRect(0, 0, s, s); speckle(c, s, 5000, ['#54524e', '#6c6a66', '#48463f'], .15, .4, 1, 3); }),
+  sheet: canvasTex(512, (c, s) => {   // colour-coated profiled steel sheet, ribs every 0.1 m
+    c.fillStyle = '#8f3d30'; c.fillRect(0, 0, s, s);
+    const n = 10, w = s / n;
+    for (let i = 0; i < n; i++) { const g = c.createLinearGradient(i * w, 0, (i + 1) * w, 0); g.addColorStop(0, '#6e2b21'); g.addColorStop(.3, '#a04a3a'); g.addColorStop(.5, '#b05545'); g.addColorStop(.7, '#9a4536'); g.addColorStop(1, '#72301f'); c.fillStyle = g; c.fillRect(i * w, 0, w, s); }
+    speckle(c, s, 1500, ['#5d241b', '#c26a58'], .04, .12, 1, 3);
+  }),
 };
 const std = (map, o = {}) => new THREE.MeshStandardMaterial(Object.assign({ map, roughness: .92, metalness: 0 }, o));
 const MAT = {
@@ -517,6 +563,10 @@ const MAT = {
   leaf: new THREE.MeshStandardMaterial({ color: '#3f6b2c', roughness: .95, side: THREE.DoubleSide }), leaf2: new THREE.MeshStandardMaterial({ color: '#547f36', roughness: .95 }),
   bark: new THREE.MeshStandardMaterial({ color: '#6b5238', roughness: 1 }), iron: new THREE.MeshStandardMaterial({ color: '#2f3a36', roughness: .5, metalness: .6 }),
   fabric: new THREE.MeshStandardMaterial({ color: '#8b5f3a', roughness: 1 }),
+  tileClad: std(TEX.tile, { roughness: .6 }),
+  sheet: std(TEX.sheet, { roughness: .5, metalness: .3 }), sheetRidge: new THREE.MeshStandardMaterial({ color: '#742f24', roughness: .5, metalness: .3 }),
+  sheetUnder: new THREE.MeshStandardMaterial({ color: '#a6aaad', roughness: .55, metalness: .35 }),
+  steel: new THREE.MeshStandardMaterial({ color: '#4d5a66', roughness: .5, metalness: .6 }),
 };
 
 /* =====================================================================
@@ -525,9 +575,12 @@ const MAT = {
    draw calls at the end.  Two buckets: 'main' and 'roof' (the roof
    bucket is what the Roof toggle lifts off).
    ===================================================================== */
-const buckets = { main: {}, roof: {} };
+// 'main' is the static building, 'ceil' static parts that lift with the roof (ceilings, porch dome),
+// 'roof' is rebuilt whenever the roof type changes.
+const buckets = { main: {}, ceil: {}, roof: {} };
 const colliders = [];     // {x1,z1,x2,z2,y0,y1} vertical prisms the walker cannot enter
 const floors = [];        // {x1,z1,x2,z2,y}   walkable surfaces (highest one wins)
+const dynColliders = [], dynFloors = [];   // the same, owned by the current roof type
 const planWalls = [], planOpenings = [], planPosts = [];
 const UP = new THREE.Vector3(0, 1, 0), DOWN = new THREE.Vector3(0, -1, 0), AX = new THREE.Vector3(1, 0, 0), AZ = new THREE.Vector3(0, 0, 1);
 
@@ -545,8 +598,9 @@ function boxGeo(x1, y1, z1, x2, y2, z2, uv = 1) {
 }
 function box(x1, y1, z1, x2, y2, z2, key, o = {}) {
   add(boxGeo(x1, y1, z1, x2, y2, z2, o.uv || 1), key, o.bucket || 'main');
-  if (o.collide) colliders.push({ x1, z1, x2, z2, y0: y1, y1: y2 });
-  if (o.floor) floors.push({ x1, z1, x2, z2, y: y2 });
+  const dyn = o.bucket === 'roof';
+  if (o.collide) (dyn ? dynColliders : colliders).push({ x1, z1, x2, z2, y0: y1, y1: y2 });
+  if (o.floor) (dyn ? dynFloors : floors).push({ x1, z1, x2, z2, y: y2 });
   if (o.plan) planWalls.push([x1, z1, x2, z2]);
 }
 // A planar polygon face with outward-facing winding and metre-scaled UVs (u along aHint, v up the slope)
@@ -593,38 +647,54 @@ function bar(p0, p1, w, h, key, bucket = 'main') {
   g.applyQuaternion(q); g.translate(p0.x, p0.y, p0.z);
   add(g, key, bucket);
 }
-// Hipped Mangalore-tile roof over an eave rectangle, with a flat soffit and fascia boards
+// Hipped roof over an eave rectangle.  Materials, thickness, soffit, fascia and
+// exposed rafters are options so the same builder makes a tiled roof, a tile-clad
+// concrete roof or a steel truss with sheets.
 function hipRoof(x1, z1, x2, z2, ye, pitch, o = {}) {
+  const k = Object.assign({ top: 'tile', soffit: 'ceiling', fascia: 'timber', ridge: 'ridge', under: 'sheetUnder', member: 'steel' }, o.keys || {});
+  const thick = o.thick ?? .12, fh = o.fasciaH ?? .23;
   const w = x2 - x1, d = z2 - z1, s = Math.min(w, d) / 2, yr = ye + s * Math.tan(pitch);
-  let faces;
+  const faces = [], rafters = [], purlins = [];
+  const ridgeW = o.thick ? .2 : .26;
   if (w >= d) {
     const rx1 = x1 + s, rx2 = x2 - s, zm = (z1 + z2) / 2;
-    faces = [
+    faces.push(
       { p: [V3(x1, ye, z2), V3(x2, ye, z2), V3(rx2, yr, zm), V3(rx1, yr, zm)], a: AX },
       { p: [V3(x2, ye, z1), V3(x1, ye, z1), V3(rx1, yr, zm), V3(rx2, yr, zm)], a: AX },
       { p: [V3(x2, ye, z2), V3(x2, ye, z1), V3(rx2, yr, zm)], a: AZ },
-      { p: [V3(x1, ye, z1), V3(x1, ye, z2), V3(rx1, yr, zm)], a: AZ },
-    ];
-    bar(V3(rx1, yr + .04, zm), V3(rx2, yr + .04, zm), .26, .1, 'ridge', 'roof');
-    for (const [cx, cz, rx] of [[x1, z1, rx1], [x1, z2, rx1], [x2, z1, rx2], [x2, z2, rx2]]) bar(V3(cx, ye + .05, cz), V3(rx, yr + .05, zm), .18, .09, 'ridge', 'roof');
+      { p: [V3(x1, ye, z1), V3(x1, ye, z2), V3(rx1, yr, zm)], a: AZ });
+    bar(V3(rx1, yr + .04, zm), V3(rx2, yr + .04, zm), ridgeW, .1, k.ridge, 'roof');
+    for (const [cx, cz, rx] of [[x1, z1, rx1], [x1, z2, rx1], [x2, z1, rx2], [x2, z2, rx2]]) bar(V3(cx, ye + .05, cz), V3(rx, yr + .05, zm), .18, .09, k.ridge, 'roof');
+    for (let x = rx1; x <= rx2 + 1e-6; x += Math.max(1.5, (rx2 - rx1) / Math.round((rx2 - rx1) / 2.4 || 1))) { rafters.push([V3(x, ye, z2), V3(x, yr, zm)], [V3(x, ye, z1), V3(x, yr, zm)]); }
+    for (const f of [.33, .66]) { const y = ye + f * (yr - ye), off = f * s; purlins.push([V3(x1 + off, y, z2 - off), V3(x2 - off, y, z2 - off)], [V3(x1 + off, y, z1 + off), V3(x2 - off, y, z1 + off)]); }
   } else {
     const rz1 = z1 + s, rz2 = z2 - s, xm = (x1 + x2) / 2;
-    faces = [
+    faces.push(
       { p: [V3(x2, ye, z1), V3(x2, ye, z2), V3(xm, yr, rz2), V3(xm, yr, rz1)], a: AZ },
       { p: [V3(x1, ye, z2), V3(x1, ye, z1), V3(xm, yr, rz1), V3(xm, yr, rz2)], a: AZ },
       { p: [V3(x1, ye, z1), V3(x2, ye, z1), V3(xm, yr, rz1)], a: AX },
-      { p: [V3(x2, ye, z2), V3(x1, ye, z2), V3(xm, yr, rz2)], a: AX },
-    ];
-    bar(V3(xm, yr + .04, rz1), V3(xm, yr + .04, rz2), .26, .1, 'ridge', 'roof');
-    for (const [cx, cz, rz] of [[x1, z1, rz1], [x2, z1, rz1], [x1, z2, rz2], [x2, z2, rz2]]) bar(V3(cx, ye + .05, cz), V3(xm, yr + .05, rz), .18, .09, 'ridge', 'roof');
+      { p: [V3(x2, ye, z2), V3(x1, ye, z2), V3(xm, yr, rz2)], a: AX });
+    bar(V3(xm, yr + .04, rz1), V3(xm, yr + .04, rz2), ridgeW, .1, k.ridge, 'roof');
+    for (const [cx, cz, rz] of [[x1, z1, rz1], [x2, z1, rz1], [x1, z2, rz2], [x2, z2, rz2]]) bar(V3(cx, ye + .05, cz), V3(xm, yr + .05, rz), .18, .09, k.ridge, 'roof');
+    for (let z = rz1; z <= rz2 + 1e-6; z += Math.max(1.5, (rz2 - rz1) / Math.round((rz2 - rz1) / 2.4 || 1))) { rafters.push([V3(x2, ye, z), V3(xm, yr, z)], [V3(x1, ye, z), V3(xm, yr, z)]); }
+    for (const f of [.33, .66]) { const y = ye + f * (yr - ye), off = f * s; purlins.push([V3(x2 - off, y, z1 + off), V3(x2 - off, y, z2 - off)], [V3(x1 + off, y, z1 + off), V3(x1 + off, y, z2 - off)]); }
   }
-  for (const f of faces) add(faceGeo(f.p, UP, f.a), 'tile', 'roof');
-  add(faceGeo([V3(x1, ye - .02, z1), V3(x2, ye - .02, z1), V3(x2, ye - .02, z2), V3(x1, ye - .02, z2)], DOWN, AX), 'ceiling', 'roof');
+  for (const f of faces) add(faceGeo(f.p, UP, f.a), k.top, 'roof');
+  if (o.noSoffit) {
+    // thin sheet: show its underside instead of a flat soffit, plus the steel that carries it
+    for (const f of faces) add(faceGeo(f.p.map(p => V3(p.x, p.y - thick, p.z)), DOWN, f.a), k.under, 'roof');
+    for (const [a, b] of rafters) bar(V3(a.x, a.y - thick - .07, a.z), V3(b.x, b.y - thick - .07, b.z), .08, .14, k.member, 'roof');
+    for (const [a, b] of purlins) bar(V3(a.x, a.y - thick - .05, a.z), V3(b.x, b.y - thick - .05, b.z), .06, .08, k.member, 'roof');
+    const e = ye - thick - .1;
+    for (const [a, b] of [[V3(x1, e, z1), V3(x2, e, z1)], [V3(x2, e, z1), V3(x2, e, z2)], [V3(x2, e, z2), V3(x1, e, z2)], [V3(x1, e, z2), V3(x1, e, z1)]]) bar(a, b, .1, .14, k.member, 'roof');
+    return;
+  }
+  add(faceGeo([V3(x1, ye - .02, z1), V3(x2, ye - .02, z1), V3(x2, ye - .02, z2), V3(x1, ye - .02, z2)], DOWN, AX), k.soffit, 'roof');
   const fs = o.fascia || [1, 1, 1, 1]; // N E S W
-  if (fs[0]) box(x1 - .04, ye - .24, z1 - .05, x2 + .04, ye - .01, z1 + .01, 'timber', { bucket: 'roof' });
-  if (fs[2]) box(x1 - .04, ye - .24, z2 - .01, x2 + .04, ye - .01, z2 + .05, 'timber', { bucket: 'roof' });
-  if (fs[1]) box(x2 - .01, ye - .24, z1 - .05, x2 + .05, ye - .01, z2 + .05, 'timber', { bucket: 'roof' });
-  if (fs[3]) box(x1 - .05, ye - .24, z1 - .05, x1 + .01, ye - .01, z2 + .05, 'timber', { bucket: 'roof' });
+  if (fs[0]) box(x1 - .04, ye - fh, z1 - .05, x2 + .04, ye - .01, z1 + .01, k.fascia, { bucket: 'roof' });
+  if (fs[2]) box(x1 - .04, ye - fh, z2 - .01, x2 + .04, ye - .01, z2 + .05, k.fascia, { bucket: 'roof' });
+  if (fs[1]) box(x2 - .01, ye - fh, z1 - .05, x2 + .05, ye - .01, z2 + .05, k.fascia, { bucket: 'roof' });
+  if (fs[3]) box(x1 - .05, ye - fh, z1 - .05, x1 + .01, ye - .01, z2 + .05, k.fascia, { bucket: 'roof' });
 }
 
 /* ---------- walls with openings ---------- */
@@ -696,16 +766,15 @@ function build() {
   box(PORCH.x1, FL, PORCH.z1, PORCH.x2, FL + .02, PORCH.z2, 'vtile');
 
   /* ---- ceilings (lift with the roof) ---- */
-  box(LW.in1, CEIL, LW.in1, LW.in2, CEIL + .08, 11.86, 'plasterIn', { bucket: 'roof' });
-  box(H1.x1, CEIL, HZ.z1, H2.x2, CEIL + .08, HZ.z2, 'plasterIn', { bucket: 'roof' });
-  box(T.x1, CEIL, 0.24, T.x2, CEIL + .08, HZ.z2, 'plasterIn', { bucket: 'roof' });
+  box(LW.in1, CEIL, LW.in1, LW.in2, CEIL + .08, 11.86, 'plasterIn', { bucket: 'ceil' });
+  box(H1.x1, CEIL, HZ.z1, H2.x2, CEIL + .08, HZ.z2, 'plasterIn', { bucket: 'ceil' });
+  box(T.x1, CEIL, 0.24, T.x2, CEIL + .08, HZ.z2, 'plasterIn', { bucket: 'ceil' });
 
   /* ---- west wing ---- */
   wall({ x1: 0, x2: EXT, z1: 0, z2: D, openings: R.map(r => win(zc(r), 1.5)) });                                   // west wall
   wall({ x1: 0, x2: ST.x2, z1: 0, z2: EXT, openings: [win(2.89, 1.5)] });                                          // north wall (wing + core)
   wall({ x1: 0, x2: V.x1, z1: 11.86, z2: D, openings: [win(2.89, 1.5)] });                                         // south wall
-  wall({ x1: V.x1, x2: V.x2, z1: 11.86, z2: D, y1: BEAM_TOP, openings: [win(6.38, 0.8, 1.0, 2.0)] });               // corridor end wall
-  add(new THREE.ExtrudeGeometry(triShape([[V.x1, BEAM_TOP], [V.x1, LEAN_TOP - .12], [V.x2, BEAM_TOP]]), { depth: EXT, bevelEnabled: false }).translate(0, 0, 11.86), 'plasterExt');
+  wall({ x1: V.x1, x2: V.x2, z1: 11.86, z2: D, y1: BEAM_TOP, openings: [win(6.38, 0.8, 1.0, 2.0)] });               // corridor end wall (top part depends on the roof)
   wall({ x1: LW.in2, x2: V.x1, z1: 0, z2: 11.86, openings: R.flatMap(r => [door(zc(r) + .55, 1.0, -1), win(zc(r) - .6, 1.0)]) }); // corridor wall
   for (let i = 0; i < 3; i++) wall({ x1: LW.in1, x2: LW.in2, z1: R[i][1], z2: R[i + 1][0], y1: CEIL, key: 'plasterIn' });
 
@@ -719,26 +788,11 @@ function build() {
   }
   bar(V3(ST.x1 + .06, FL + rise + .95, ST.zBot - tread / 2), V3(ST.x1 + .06, FL + nT * rise + .95, ST.zTop + tread / 2), .07, .07, 'timber');
   for (let i = 0; i < nT; i += 2) { const z = ST.zBot - (i + .5) * tread, y = FL + (i + 1) * rise; box(ST.x1 + .04, y, z - .02, ST.x1 + .08, y + .95, z + .02, 'timber'); }
-  // terrace slab with the stair opening, parapets, stair head ("mumty")
-  box(V.x1, CEIL, 0.24, V.x2, 4.05, HV.z1, 'concrete', { bucket: 'roof', floor: true });
-  box(V.x2, CEIL, 0.24, ST.x2, 4.05, ST.zTop, 'concrete', { bucket: 'roof', floor: true });
-  box(V.x2, CEIL, 3.90, ST.x2, 4.05, HV.z1, 'concrete', { bucket: 'roof', floor: true });
-  box(V.x1, 4.05, 0, 6.86, 4.85, EXT, 'plasterExt', { bucket: 'roof', collide: true });
-  box(V.x1, 4.05, HZ.z2, ST.x2, 4.85, HV.z1, 'plasterExt', { bucket: 'roof', collide: true });
-  box(V.x1 - .02, 4.85, -.02, 6.86, 4.93, EXT + .02, 'concrete', { bucket: 'roof' });
-  box(V.x1 - .02, 4.85, HZ.z2 - .02, ST.x2, 4.93, HV.z1 + .02, 'concrete', { bucket: 'roof' });
-  wall({ x1: 6.86, x2: H1.x1, z1: 0, z2: EXT, y0: 4.05, y1: 6.30, bucket: 'roof', plan: false });
-  wall({ x1: ST.x2, x2: H1.x1, z1: 0.24, z2: 4.02, y0: 4.05, y1: 6.30, bucket: 'roof', plan: false });
-  wall({ x1: 6.86, x2: H1.x1, z1: 3.90, z2: 4.02, y0: 4.05, y1: 6.30, bucket: 'roof', plan: false });
-  wall({ x1: 6.86, x2: V.x2, z1: 0.24, z2: 4.02, y0: 4.05, y1: 6.30, bucket: 'roof', plan: false, openings: [door(0.95, 0.9, 1, 2.0)] });
-  hipRoof(6.56, -0.06, 8.72, 4.32, 6.32, 28 * DEG, { fascia: [1, 1, 1, 1] });
-  colliders.push({ x1: V.x1 - .3, z1: 0.24, x2: V.x1, z2: HV.z1, y0: 4.0, y1: 6 });   // terrace west edge (roof slope)
 
   /* ---- halls and toilets ---- */
   wall({ x1: ST.x2, x2: T.x1, z1: 0, z2: HN, openings: [9.62, 12.26, 14.875, 17.5].map(x => win(x, 1.5)) });          // north wall, thicker
   wall({ x1: T.x1, x2: E.x1, z1: 0, z2: EXT, openings: [vent(19.7)] });
-  wall({ x1: E.x1, x2: E.x2, z1: 0, z2: EXT, y1: BEAM_TOP });
-  add(new THREE.ExtrudeGeometry(triShape([[E.x1, BEAM_TOP], [E.x1, LEAN_TOP - .12], [E.x2, BEAM_TOP]]), { depth: EXT, bevelEnabled: false }), 'plasterExt');
+  wall({ x1: E.x1, x2: E.x2, z1: 0, z2: EXT, y1: BEAM_TOP });                                                           // passage end wall (top depends on the roof)
   wall({ x1: H1.x2, x2: H2.x1, z1: HZ.z1, z2: HZ.z2, y1: CEIL, key: 'plasterIn', openings: [door(2.72, 1.5, 1)] });     // shared partition
   wall({ x1: H2.x2, x2: T.x1, z1: 0.24, z2: HZ.z2, y1: CEIL, key: 'plasterIn' });
   for (let i = 0; i < 2; i++) wall({ x1: T.x1, x2: T.x2, z1: T.rows[i][1], z2: T.rows[i + 1][0], y1: CEIL, key: 'plasterIn' });
@@ -749,40 +803,15 @@ function build() {
     box(x - .18, FL, HZ.z2 - .04, x + .18, WTOP, HV.z1 + .04, 'plasterExt', { plan: true });
   }
 
-  /* ---- verandah: seat wall, timber posts, beams ---- */
+  /* ---- verandah seat wall (posts and beams belong to the roof pass) ---- */
   const seat = (x1, z1, x2, z2) => { box(x1, FL, z1, x2, POST_BASE, z2, 'plasterExt', { collide: true }); box(x1 - .03, POST_BASE, z1 - .03, x2 + .03, POST_BASE + .05, z2 + .03, 'laterite'); };
   seat(V.x2 - EXT, PORCH.z2, V.x2, 11.86);
   seat(PORCH.x2, HV.z2 - EXT, E.x1, HV.z2);
   seat(E.x2 - EXT, 0.24, E.x2, HV.z2);
-  const post = (x, z) => {
-    box(x - .075, POST_BASE, z - .075, x + .075, BEAM_TOP - .25, z + .075, 'timber', { collide: true });
-    box(x - .22, BEAM_TOP - .42, z - .075, x + .22, BEAM_TOP - .25, z + .075, 'timber');
-    box(x - .075, BEAM_TOP - .42, z - .22, x + .075, BEAM_TOP - .25, z + .22, 'timber');
-    planPosts.push([x, z]);
-  };
-  const runPosts = (x0, z0, x1, z1, n) => { for (let i = 0; i <= n; i++) post(x0 + (x1 - x0) * i / n, z0 + (z1 - z0) * i / n); };
-  runPosts(V.x2 - .12, PORCH.z2 + .35, V.x2 - .12, 11.74, 1);
-  runPosts(PORCH.x2 + .35, HV.z2 - .12, E.x1 - .05, HV.z2 - .12, 5);
-  runPosts(E.x2 - .12, 0.40, E.x2 - .12, HV.z2 - .12, 3);
-  box(V.x2 - .2, BEAM_TOP - .25, PORCH.z2, V.x2 - .04, BEAM_TOP, 11.86, 'timber');
-  box(PORCH.x2, BEAM_TOP - .25, HV.z2 - .2, E.x2, BEAM_TOP, HV.z2 - .04, 'timber');
-  box(E.x2 - .2, BEAM_TOP - .25, 0.24, E.x2 - .04, BEAM_TOP, HV.z2, 'timber');
+  for (const [x, z] of POSTS) planPosts.push([x, z]);
   // steps down at the east end of the corridor
   box(E.x1, 0, HV.z2, E.x2, FL - .2, HV.z2 + .3, 'laterite', { floor: true });
   box(E.x1, 0, HV.z2, E.x2, FL - .4, HV.z2 + .6, 'laterite', { floor: true });
-
-  /* ---- verandah lean-to roofs (tile over timber) ---- */
-  const leanV = (x, z) => LEAN_TOP - LEAN_SLOPE * (x - V.x1);
-  const leanH = (x, z) => LEAN_TOP - LEAN_SLOPE * (z - HV.z1);
-  const leanE = (x, z) => LEAN_TOP - LEAN_SLOPE * (x - E.x1);
-  slab([[5.66, HV.z1], [V.x2, HV.z1], [V.x2, PORCH.z1], [7.22, PORCH.z1], [7.22, PORCH.z2], [7.58, PORCH.z2], [7.58, D + .6], [5.66, D + .6]], leanV, .12, 'tile', 'ceiling', 'timber', AZ);
-  slab([[V.x1, 5.24], [PORCH.x2, 5.24], [PORCH.x2, 6.80], [V.x2, 6.80], [V.x2, 7.16], [V.x1, 7.16]], leanH, .12, 'tile', 'ceiling', 'timber', AX);
-  slab([[PORCH.x2, 5.24], [E.x1, 5.24], [E.x2 + .7, 7.16], [PORCH.x2, 7.16]], leanH, .12, 'tile', 'ceiling', 'timber', AX);
-  slab([[20.55, -.36], [E.x2 + .7, -.36], [E.x2 + .7, 7.16], [20.55, HV.z1 - .1]], leanE, .12, 'tile', 'ceiling', 'timber', AZ);
-
-  /* ---- main hipped roofs ---- */
-  hipRoof(-0.9, -0.9, V.x1 + .2, D + .9, EAVE, PITCH, { fascia: [1, 0, 1, 1] });
-  hipRoof(H1.x1, -0.9, E.x1 + .9, HV.z1 + .9, EAVE, PITCH, { fascia: [1, 1, 1, 0] });
 
   /* ---- entrance porch: pointed arches, cornice, low dome ---- */
   const PH = 3.9, thick = .30, aw = 1.9, spring = FL + 1.95, apex = FL + 3.10;
@@ -790,12 +819,12 @@ function build() {
   const archZ = (x1) => add(archWallGeo(PORCH.z2 - PORCH.z1, PH - FL, thick, aw, spring - FL, apex - FL).rotateY(-Math.PI / 2).translate(x1 + thick, FL, PORCH.z1), 'plasterExt');
   archX(PORCH.z1); archX(PORCH.z2 - thick); archZ(PORCH.x1); archZ(PORCH.x2 - thick);
   for (const [x, z] of [[PORCH.x1, PORCH.z1], [PORCH.x2 - .4, PORCH.z1], [PORCH.x1, PORCH.z2 - .4], [PORCH.x2 - .4, PORCH.z2 - .4]]) colliders.push({ x1: x, z1: z, x2: x + .4, z2: z + .4, y0: FL, y1: PH });
-  box(PORCH.x1 - .12, PH - .12, PORCH.z1 - .12, PORCH.x2 + .12, PH, PORCH.z2 + .12, 'plasterExt', { bucket: 'roof' });
-  box(PORCH.x1 - .18, PH, PORCH.z1 - .18, PORCH.x2 + .18, PH + .16, PORCH.z2 + .18, 'plasterExt', { bucket: 'roof' });
+  box(PORCH.x1 - .12, PH - .12, PORCH.z1 - .12, PORCH.x2 + .12, PH, PORCH.z2 + .12, 'plasterExt', { bucket: 'ceil' });
+  box(PORCH.x1 - .18, PH, PORCH.z1 - .18, PORCH.x2 + .18, PH + .16, PORCH.z2 + .18, 'plasterExt', { bucket: 'ceil' });
   const pcx = (PORCH.x1 + PORCH.x2) / 2, pcz = (PORCH.z1 + PORCH.z2) / 2;
-  box(pcx - 1.3, PH + .16, pcz - 1.3, pcx + 1.3, PH + .5, pcz + 1.3, 'plasterExt', { bucket: 'roof' });
-  { const g = new THREE.SphereGeometry(1.22, 36, 18, 0, Math.PI * 2, 0, Math.PI / 2); g.translate(pcx, PH + .5, pcz); add(g, 'dome', 'roof'); }
-  { const g = new THREE.CylinderGeometry(.05, .07, .5, 10); g.translate(pcx, PH + 1.95, pcz); add(g, 'brass', 'roof'); const s = new THREE.SphereGeometry(.11, 14, 10); s.translate(pcx, PH + 2.25, pcz); add(s, 'brass', 'roof'); }
+  box(pcx - 1.3, PH + .16, pcz - 1.3, pcx + 1.3, PH + .5, pcz + 1.3, 'plasterExt', { bucket: 'ceil' });
+  { const g = new THREE.SphereGeometry(1.22, 36, 18, 0, Math.PI * 2, 0, Math.PI / 2); g.translate(pcx, PH + .5, pcz); add(g, 'dome', 'ceil'); }
+  { const g = new THREE.CylinderGeometry(.05, .07, .5, 10); g.translate(pcx, PH + 1.95, pcz); add(g, 'brass', 'ceil'); const s = new THREE.SphereGeometry(.11, 14, 10); s.translate(pcx, PH + 2.25, pcz); add(s, 'brass', 'ceil'); }
   // porch steps (two risers of 0.2 m, wrapping the south and east sides)
   box(PORCH.x1, 0, PORCH.z1, PORCH.x2 + .3, FL - .2, PORCH.z2 + .3, 'laterite', { floor: true });
   box(PORCH.x1, 0, PORCH.z1, PORCH.x2 + .6, FL - .4, PORCH.z2 + .6, 'laterite', { floor: true });
@@ -826,6 +855,112 @@ function build() {
   for (const [x, z] of [[11.5, 15.9], [14, 16], [19, 16], [22.5, 16], [24.5, 8], [24.5, 12]]) { const g = new THREE.IcosahedronGeometry(.55 + rnd() * .3, 1); g.scale(1, .75, 1); g.translate(x, .4, z); add(g, 'leaf2'); }
 }
 function triShape(pts) { const s = new THREE.Shape(); s.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) s.lineTo(pts[i][0], pts[i][1]); s.closePath(); return s; }
+
+/* ---- everything that depends on the roof type: supports, lean-tos, main roofs, terrace ---- */
+function buildRoof(type) {
+  const { V, ST, HZ, H1, E, HV, PORCH, X, D } = P;
+  const flat = ROOF_TYPES[type].flat, trad = type === 'tile';
+  const keys = trad ? { top: 'tile', soffit: 'ceiling', fascia: 'timber', ridge: 'ridge' } : { top: 'tileClad', soffit: 'plasterExt', fascia: 'plasterExt', ridge: 'ridge' };
+  const pitch = trad ? PITCH : 25 * DEG, ov = trad ? .9 : .75, thick = .12, fasciaH = trad ? .23 : .3;
+  const RB = { bucket: 'roof' };
+
+  // tops of the two low end walls: a triangle under a lean-to, or straight up to a flat slab
+  if (flat) { box(V.x1, BEAM_TOP, 11.86, V.x2, CEIL, D, 'plasterExt', RB); box(E.x1, BEAM_TOP, 0, E.x2, CEIL, EXT, 'plasterExt', RB); }
+  else {
+    add(new THREE.ExtrudeGeometry(triShape([[V.x1, BEAM_TOP], [V.x1, LEAN_TOP - thick], [V.x2, BEAM_TOP]]), { depth: EXT, bevelEnabled: false }).translate(0, 0, 11.86), 'plasterExt', 'roof');
+    add(new THREE.ExtrudeGeometry(triShape([[E.x1, BEAM_TOP], [E.x1, LEAN_TOP - thick], [E.x2, BEAM_TOP]]), { depth: EXT, bevelEnabled: false }), 'plasterExt', 'roof');
+  }
+
+  // verandah supports: timber posts with brackets for the tiled roof, plastered concrete columns otherwise
+  const topY = flat ? CEIL : BEAM_TOP, pk = trad ? 'timber' : 'plasterExt', pw = trad ? .075 : .125;
+  for (const [x, z] of POSTS) {
+    box(x - pw, POST_BASE, z - pw, x + pw, topY - .25, z + pw, pk, { bucket: 'roof', collide: true });
+    if (trad) { box(x - .22, topY - .42, z - .075, x + .22, topY - .25, z + .075, 'timber', RB); box(x - .075, topY - .42, z - .22, x + .075, topY - .25, z + .22, 'timber', RB); }
+    else box(x - pw - .03, topY - .33, z - pw - .03, x + pw + .03, topY - .25, z + pw + .03, pk, RB);
+  }
+  const [b0, b1] = trad ? [.2, .04] : [.25, 0];
+  box(V.x2 - b0, topY - .25, PORCH.z2, V.x2 - b1, topY, 11.86, pk, RB);
+  box(PORCH.x2, topY - .25, HV.z2 - b0, E.x2, topY, HV.z2 - b1, pk, RB);
+  box(E.x2 - b0, topY - .25, 0.24, E.x2 - b1, topY, HV.z2, pk, RB);
+
+  // stair core: slab with the stair opening, and the stair head ("mumty") the stair arrives in
+  box(V.x1, CEIL, 0.24, V.x2, 4.05, HV.z1, 'concrete', { bucket: 'roof', floor: true });
+  box(V.x2, CEIL, 0.24, ST.x2, 4.05, ST.zTop, 'concrete', { bucket: 'roof', floor: true });
+  box(V.x2, CEIL, 3.90, ST.x2, 4.05, HV.z1, 'concrete', { bucket: 'roof', floor: true });
+  wall({ x1: 6.86, x2: H1.x1, z1: 0, z2: EXT, y0: 4.05, y1: 6.30, bucket: 'roof', plan: false });
+  wall({ x1: ST.x2, x2: H1.x1, z1: 0.24, z2: 4.02, y0: 4.05, y1: 6.30, bucket: 'roof', plan: false });
+  wall({ x1: 6.86, x2: H1.x1, z1: 3.90, z2: 4.02, y0: 4.05, y1: 6.30, bucket: 'roof', plan: false });
+  wall({ x1: 6.86, x2: V.x2, z1: 0.24, z2: 4.02, y0: 4.05, y1: 6.30, bucket: 'roof', plan: false, openings: [door(0.95, 0.9, 1, 2.0)] });
+  if (flat) box(6.66, 6.30, -0.2, H1.x1 + .2, 6.45, 4.22, 'concrete', RB);
+  else hipRoof(6.56, -0.06, 8.72, 4.32, 6.32, trad ? 28 * DEG : 25 * DEG, { keys, fasciaH });
+
+  if (!flat) {
+    // parapets of the small terrace between the two roofs
+    box(V.x1, 4.05, 0, 6.86, 4.85, EXT, 'plasterExt', { bucket: 'roof', collide: true });
+    box(V.x1, 4.05, HZ.z2, ST.x2, 4.85, HV.z1, 'plasterExt', { bucket: 'roof', collide: true });
+    box(V.x1 - .02, 4.85, -.02, 6.86, 4.93, EXT + .02, 'concrete', RB);
+    box(V.x1 - .02, 4.85, HZ.z2 - .02, ST.x2, 4.93, HV.z1 + .02, 'concrete', RB);
+    dynColliders.push({ x1: V.x1 - .3, z1: 0.24, x2: V.x1, z2: HV.z1, y0: 4.0, y1: 6 });
+    // verandah lean-to roofs
+    const leanV = x => LEAN_TOP - LEAN_SLOPE * (x - V.x1), leanH = (x, z) => LEAN_TOP - LEAN_SLOPE * (z - HV.z1), leanE = x => LEAN_TOP - LEAN_SLOPE * (x - E.x1);
+    const lk = [keys.top, trad ? 'ceiling' : 'plasterExt', trad ? 'timber' : 'plasterExt'];
+    slab([[5.66, HV.z1], [V.x2, HV.z1], [V.x2, PORCH.z1], [7.22, PORCH.z1], [7.22, PORCH.z2], [7.58, PORCH.z2], [7.58, D + .6], [5.66, D + .6]], leanV, thick, ...lk, AZ);
+    slab([[V.x1, 5.24], [PORCH.x2, 5.24], [PORCH.x2, 6.80], [V.x2, 6.80], [V.x2, 7.16], [V.x1, 7.16]], leanH, thick, ...lk, AX);
+    slab([[PORCH.x2, 5.24], [E.x1, 5.24], [E.x2 + .7, 7.16], [PORCH.x2, 7.16]], leanH, thick, ...lk, AX);
+    slab([[20.55, -.36], [E.x2 + .7, -.36], [E.x2 + .7, 7.16], [20.55, HV.z1 - .1]], leanE, thick, ...lk, AZ);
+    // main hipped roofs
+    hipRoof(-ov, -ov, V.x1 + .2, D + ov, EAVE, pitch, { keys, fascia: [1, 0, 1, 1], fasciaH });
+    hipRoof(H1.x1, -ov, E.x1 + ov, HV.z1 + ov, EAVE, pitch, { keys, fascia: [1, 1, 1, 0], fasciaH });
+  } else {
+    // one RCC slab over the whole L (the stair core has its own), projecting 0.45 m, parapets on the wall lines
+    const y0 = CEIL, y1 = 4.05, p = .45, F = { bucket: 'roof', floor: true };
+    box(-p, y0, -p, V.x1, y1, D + p, 'concrete', F);
+    box(V.x1, y0, -p, ST.x2, y1, 0.24, 'concrete', F);
+    box(V.x1, y0, HV.z1, V.x2 + p, y1, D + p, 'concrete', F);
+    box(V.x2, y0, HV.z1, ST.x2, y1, HV.z2 + p, 'concrete', F);
+    box(ST.x2, y0, -p, X + p, y1, HV.z2 + p, 'concrete', F);
+    const par = (x1, z1, x2, z2) => { box(x1, y1, z1, x2, 4.90, z2, 'plasterExt', { bucket: 'roof', collide: true }); box(x1 - .03, 4.90, z1 - .03, x2 + .03, 4.96, z2 + .03, 'concrete', RB); };
+    par(0, 0, EXT, D); par(0, 0, X, EXT); par(0, D - EXT, V.x2, D); par(V.x2 - EXT, HV.z2, V.x2, D); par(V.x2, HV.z2 - EXT, X, HV.z2); par(X - EXT, 0, X, HV.z2);
+    if (type === 'truss') buildTruss();
+  }
+}
+function buildTruss() {
+  const { V, HV, X, D } = P;
+  const ye = 4.05 + 2.55, pitch = 15 * DEG, o = .95;   // eave clears the 6.45 m stair head
+  const tk = { keys: { top: 'sheet', ridge: 'sheetRidge' }, thick: .03, noSoffit: true };
+  hipRoof(-o, -o, V.x2 + o, D + o, ye, pitch, tk);
+  hipRoof(V.x2 - .3, -o, X + o, HV.z2 + o, ye, pitch, tk);
+  // steel posts on the parapets about every 3 m, with a ring beam under the rafters
+  const top = ye + o * Math.tan(pitch) - .03 - .1;
+  const line = (x0, z0, x1, z1) => {
+    const n = Math.max(1, Math.round(Math.hypot(x1 - x0, z1 - z0) / 3));
+    for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n, z = z0 + (z1 - z0) * i / n; box(x - .05, 4.96, z - .05, x + .05, top, z + .05, 'steel', { bucket: 'roof' }); }
+    bar(V3(x0, top - .06, z0), V3(x1, top - .06, z1), .1, .12, 'steel', 'roof');
+  };
+  line(.12, .12, .12, D - .12); line(.12, .12, X - .12, .12); line(.12, D - .12, V.x2 - .12, D - .12);
+  line(V.x2 - .12, HV.z2 - .12, V.x2 - .12, D - .12); line(V.x2 - .12, HV.z2 - .12, X - .12, HV.z2 - .12); line(X - .12, .12, X - .12, HV.z2 - .12);
+}
+function setTerrace(type) {
+  const r = roomById.terrace, flat = ROOF_TYPES[type].flat;
+  const { V, ST, H1, HV, X, D } = P;
+  if (flat) {
+    r.rects = [[H1.x1, 0.24, X - EXT, HV.z2 - EXT], [EXT, EXT, V.x2 - EXT, D - EXT], [V.x2, 4.02, H1.x1, HV.z2 - EXT], [V.x2, 0.24, ST.x2, ST.zTop]];
+    r.kind = 'Roof terrace over the whole building'; r.w = 0; r.d = 0; r.labelY = 1.8;
+    r.dims = 'Whole roof'; r.area = `About ${Math.round((V.x2 * D + (X - V.x2) * HV.z2) / 5) * 5} m² of terrace`;
+    r.note = type === 'truss'
+      ? 'The flat slab stays a usable terrace, sheltered by a steel truss carrying colour-coated sheets so it works through the monsoon. Reached from the stair head.'
+      : 'The whole roof is a usable terrace: an RCC slab with 0.85 m parapets all round, reached from the stair head. Rainwater drains through spouts in the parapet.';
+  } else {
+    r.rects = [[V.x1, 0.24, 6.86, ST.zBot], [6.86, 4.02, ST.x2, ST.zBot]];
+    r.kind = 'Flat roof over the stair core'; r.w = 2.40; r.d = 5.12; r.labelY = 3.4; r.dims = undefined; r.area = undefined;
+    r.note = 'A small flat terrace between the two sloped roofs, reached from the stair head. Parapets on the north and south edges.';
+  }
+  r.minor = !flat;
+  for (const p of r.planes) { scene.remove(p); pickables.splice(pickables.indexOf(p), 1); p.geometry.dispose(); p.material.dispose(); }
+  makePlanes(r);
+  labelEls[r.id].innerHTML = `${r.name}<small>${r.dims || `${fmt(r.w)} × ${fmt(r.d)} m`}</small>`;
+  if (selected === r) renderCard(r);
+}
 function archWallGeo(len, h, thick, aw, spring, apex) {
   const s = new THREE.Shape(); s.moveTo(0, 0); s.lineTo(len, 0); s.lineTo(len, h); s.lineTo(0, h); s.closePath();
   const cx = len / 2, rise = apex - spring, c = (rise * rise - aw * aw / 4) / aw, R = aw / 2 + c;
@@ -861,18 +996,31 @@ function palm(x, z, h, lean) {
 build();
 const mainGroup = new THREE.Group(), roofGroup = new THREE.Group();
 scene.add(mainGroup, roofGroup);
-for (const [bname, bucket] of Object.entries(buckets)) {
+function mergeBucket(bucket, group) {
+  const meshes = [];
   for (const [key, geos] of Object.entries(bucket)) {
-    const merged = mergeGeometries(geos, false);
-    const mesh = new THREE.Mesh(merged, MAT[key]);
+    const mesh = new THREE.Mesh(mergeGeometries(geos, false), MAT[key]);
     mesh.castShadow = true; mesh.receiveShadow = true;
-    (bname === 'roof' ? roofGroup : mainGroup).add(mesh);
-    geos.forEach(g => g.dispose());
+    group.add(mesh); meshes.push(mesh); geos.forEach(g => g.dispose());
   }
+  return meshes;
+}
+mergeBucket(buckets.main, mainGroup);
+mergeBucket(buckets.ceil, roofGroup);
+let roofMeshes = [];
+function rebuildRoof(type) {
+  for (const m of roofMeshes) { roofGroup.remove(m); m.geometry.dispose(); }
+  buckets.roof = {}; dynColliders.length = 0; dynFloors.length = 0;
+  buildRoof(type);
+  roofMeshes = mergeBucket(buckets.roof, roofGroup);
+  roofType = type;
+  setTerrace(type);
+  for (const b of document.querySelectorAll('#roofMenu [data-type]')) b.setAttribute('aria-checked', b.dataset.type === type);
+  const d = document.querySelector('#list button[data-id="terrace"] .d'); if (d) d.textContent = roomById.terrace.dims ? '' : `${fmt(roomById.terrace.w)} × ${fmt(roomById.terrace.d)} m`;
 }
 const pickables = [], labelEls = {};
 const labelsLayer = document.getElementById('labels');
-for (const r of ROOMS) {
+function makePlanes(r) {
   r.planes = [];
   for (const [x1, z1, x2, z2] of r.rects) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(x2 - x1, z2 - z1), new THREE.MeshBasicMaterial({ color: '#e0a93f', transparent: true, opacity: 0, depthWrite: false }));
@@ -881,6 +1029,9 @@ for (const r of ROOMS) {
   }
   const [x1, z1, x2, z2] = r.rects[0];
   r.center = V3((x1 + x2) / 2, r.y + (r.labelY ?? 1.5), (z1 + z2) / 2);
+}
+for (const r of ROOMS) {
+  makePlanes(r);
   const el = document.createElement('button');
   el.className = 'lbl'; el.type = 'button'; el.dataset.id = r.id;
   el.innerHTML = `${r.name}<small>${r.dims || `${fmt(r.w)} × ${fmt(r.d)} m`}</small>`;
@@ -920,10 +1071,10 @@ function focusRoom(r) {
   flyTo(c.clone().add(dir.normalize().multiplyScalar(dist)), c, 1100);
 }
 
-function groundAt(x, z) { let y = 0; for (const f of floors) if (x >= f.x1 && x <= f.x2 && z >= f.z1 && z <= f.z2 && f.y > y) y = f.y; return y; }
+function groundAt(x, z) { let y = 0; for (const list of [floors, dynFloors]) for (const f of list) if (x >= f.x1 && x <= f.x2 && z >= f.z1 && z <= f.z2 && f.y > y) y = f.y; return y; }
 function collide(x, z, feet) {
   const r = .32;
-  for (let it = 0; it < 3; it++) for (const c of colliders) {
+  for (let it = 0; it < 3; it++) for (const list of [colliders, dynColliders]) for (const c of list) {
     if (c.y0 > feet + 1.6 || c.y1 < feet + .25) continue;
     const cx = Math.max(c.x1, Math.min(x, c.x2)), cz = Math.max(c.z1, Math.min(z, c.z2));
     let dx = x - cx, dz = z - cz, d2 = dx * dx + dz * dz;
@@ -1086,8 +1237,21 @@ tPlan.addEventListener('click', () => setPlan(!planOn));
 document.getElementById('pClose').addEventListener('click', () => setPlan(false));
 let labelsOn = true;
 tLabels.addEventListener('click', () => { labelsOn = !labelsOn; tLabels.setAttribute('aria-pressed', labelsOn); labelsLayer.classList.toggle('off', !labelsOn); });
+/* ---- roof menu: type radio items plus the lift toggle ---- */
+const roofMenu = document.getElementById('roofMenu'), tLift = document.getElementById('tLift');
+const openMenu = () => { roofMenu.hidden = false; tRoof.setAttribute('aria-expanded', 'true'); };
+const closeMenu = () => { roofMenu.hidden = true; tRoof.setAttribute('aria-expanded', 'false'); };
+for (const [id, t] of Object.entries(ROOF_TYPES)) {
+  const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'menuitemradio'); b.dataset.type = id; b.setAttribute('aria-checked', id === roofType);
+  b.innerHTML = `<b>${t.name}</b><small>${t.desc}</small>`;
+  b.addEventListener('click', () => { if (id !== roofType) { rebuildRoof(id); toast(`Roof changed to ${t.name.toLowerCase()}.`); } closeMenu(); });
+  roofMenu.insertBefore(b, roofMenu.querySelector('.sep'));
+}
+tRoof.addEventListener('click', () => roofMenu.hidden ? openMenu() : closeMenu());
+document.addEventListener('pointerdown', e => { if (!roofMenu.hidden && !e.target.closest('.menu')) closeMenu(); });
+addEventListener('keydown', e => { if (e.code === 'Escape' && !roofMenu.hidden) closeMenu(); });
 let roofOn = true;
-tRoof.addEventListener('click', () => { roofOn = !roofOn; tRoof.setAttribute('aria-pressed', roofOn); roofGroup.visible = roofOn; toast(roofOn ? 'Roofs back on.' : 'Roofs lifted so you can look straight into the rooms.'); });
+tLift.addEventListener('click', () => { roofOn = !roofOn; tLift.setAttribute('aria-checked', !roofOn); roofGroup.visible = roofOn; toast(roofOn ? 'Roof back on.' : 'Roof lifted so you can look straight into the rooms.'); });
 document.getElementById('pDrawing').addEventListener('click', () => setPlanTab('drawing'));
 document.getElementById('pModel').addEventListener('click', () => setPlanTab('model'));
 function setPlanTab(t) {
@@ -1208,7 +1372,7 @@ function frame(now) {
   }
   renderer.render(scene, camera);
 }
-document.fonts?.ready?.then(() => {}).catch(() => {});
+rebuildRoof(roofType);
 document.getElementById('loading').classList.add('gone');
 requestAnimationFrame(frame);
 </script>

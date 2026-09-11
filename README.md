@@ -26,6 +26,14 @@ script. Room rectangles, wall positions, the column grid, plot size and gate pos
 live there; the walls, roofs, floors, colliders, labels and the model plan are generated
 from those numbers.
 
+## Roof types
+
+The Roof menu in the top bar swaps the whole roof layer between four options common on
+new Kerala buildings: clay tile on timber, sloped concrete with tile cladding, a flat
+concrete terrace with parapets, and a flat slab with a steel truss and metal sheets above.
+Verandah supports, the roof terrace and walk-mode floors follow the choice. Add a type by
+extending `ROOF_TYPES` and `buildRoof()`.
+
 ## Known deviation from the drawing
 
 The labelled room widths (5.78 + 2.40 + 5.06 + 5.06 + 1.50 m) add up to 19.80 m before
